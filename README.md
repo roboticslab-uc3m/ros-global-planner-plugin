@@ -1,0 +1,1 @@
+# ros-global-planner-plugin
