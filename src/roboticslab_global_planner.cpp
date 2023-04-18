@@ -331,16 +331,29 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     
     std::cout << "Roll: " << roll << " Pitch: " << pitch << " Yaw: " << yaw << std::endl;
 
-    int floor = -1;
+    int floorInit = -1;
     int num_floors = 8;
 
     std::cout << "YAW/num_floors: "<< yaw/num_floors << std::endl;
 
     for (int i=0; i<num_floors; i++)
     {
-        if(yaw<=(M_PI-(M_PI/num_floors)*(2*(i-1)+1)) && yaw>(M_PI-(M_PI/num_floors)*(2*i+1)) )
+        std::cout<< "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"<<std::endl;
+        std::cout<< "yaw y los limites: "<< yaw <<std::endl;
+        std::cout<<M_PI-(M_PI/num_floors)*(2*(i-1)+1)<< std::endl;
+        std::cout<<M_PI-(M_PI/num_floors)*(2*i+1)<< std::endl;
+        if(i ==0)
         {
-            floor = i;
+            if((yaw>=2.74 && yaw<3.14) || (yaw>=-3.14 && yaw<-2.74))     //UP CASE 0
+            {floorInit = 0;}
+        }
+        else
+        {
+            if(yaw<=(M_PI-(M_PI/num_floors)*(2*(i-1)+1)) && yaw>(M_PI-(M_PI/num_floors)*(2*i+1)) )
+            {
+                std::cout<< "dentro del if"<<std::endl;
+                floorInit = i;
+            }
         }   
     }
 
@@ -366,8 +379,8 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     //     return false;
     // }
 
-    std::cout<<"Start floor: "<<floor<<std::endl;
-    ROS_INFO_STREAM("=============================== roboticslab: GLOBAL PLANNER: start floor: "<< floor<< " .");
+    std::cout<<"Start floor: "<<floorInit<<std::endl;
+    ROS_INFO_STREAM("=============================== roboticslab: GLOBAL PLANNER: start floor: "<< floorInit<< " .");
 
 
     // ** Orientation: Goal
@@ -383,9 +396,22 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
     for (int i=0; i<num_floors; i++)
     {
-        if(yaw<=(M_PI-(M_PI/num_floors)*(2*(i-1)+1)) && yaw>(M_PI-(M_PI/num_floors)*(2*i+1)) )
+        std::cout<< "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"<<std::endl;
+        std::cout<< "yaw y los limites: "<< yaw <<std::endl;
+        std::cout<<M_PI-(M_PI/num_floors)*(2*(i-1)+1)<< std::endl;
+        std::cout<<M_PI-(M_PI/num_floors)*(2*i+1)<< std::endl;
+        if(i ==0)
         {
-            goalFloor = i;
+            if((yaw>=2.74 && yaw<3.14) || (yaw>=-3.14 && yaw<-2.74))     //UP CASE 0
+            {goalFloor = 0;}
+        }
+        else
+        {
+            if(yaw<=(M_PI-(M_PI/num_floors)*(2*(i-1)+1)) && yaw>(M_PI-(M_PI/num_floors)*(2*i+1)) )
+            {
+                std::cout<< "dentro del if"<<std::endl;
+                goalFloor = i;
+            }
         }        
     }
 
@@ -410,7 +436,9 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     //     return false;
     // }
 
+    int otherFloor = floor((yaw+M_PI)*8/(2*M_PI));
     std::cout<<"Goal floor: "<<goalFloor<<std::endl;
+    std::cout<<"Other floor: "<<otherFloor<<std::endl;
     ROS_INFO_STREAM(" =============================== roboticslab: GLOBAL PLANNER: goal floor: "<< goalFloor<< " .");
 
 
@@ -425,14 +453,14 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     for(int i=0;i<8;i++)
         copy_layers_MatCostmap[i] = layers_MatCostmap[i].clone();
     
-    copy_layers_MatCostmap[floor].at<uchar>(startX,startY) = 180;
+    copy_layers_MatCostmap[floorInit].at<uchar>(startX,startY) = 180;
     copy_layers_MatCostmap[goalFloor].at<uchar>(goalX,goalY) = 181;
 
     std::cout<< "After changing values of start and goal in map"<<std::endl;
     
     std::vector<Node*> nodes;
 
-    Node* init = new Node(startX, startY, floor, 0, -2);
+    Node* init = new Node(startX, startY, floorInit, 0, -2);
     nodes.push_back(init);
     std::cout<< "After pushback"<<std::endl;
 
@@ -545,31 +573,58 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     std::chrono::steady_clock::time_point begin_traceback = std::chrono::steady_clock::now();
     cv::Mat path_MatCostmap = cv::Mat(_pixelsX_reduced, _pixelsY_reduced, CV_8UC1,cv::Scalar(255));
 
-    while( ! ok )
+    if (nodes.size()==1)
     {
-        ROS_INFO("=============================== roboticslab: GLOBAL PLANNER: traceback begin ");
-        for(int nodeIdx=0; nodeIdx<nodes.size(); nodeIdx++)
+        Node* tmp = nodes[0];
+        std::cout<<"Node (" << tmp->_id << "): " << tmp->_x << ", " << tmp->_y << " ," << tmp->_z << std::endl;
+        planNodes.push_front(tmp);
+        path_MatCostmap.at<uchar>(tmp->_x, tmp->_y) = 80;
+        std::cout << "Path matcostmap   " << std::endl << path_MatCostmap << std::endl;
+
+        goalParentId = nodes[0]->_parentId;
+        if( goalParentId == 0)
         {
-            if( nodes[nodeIdx]->_id == goalParentId )
+            ok = true;
+            cv::imwrite("path.png",path_MatCostmap);
+            std::cout<<"...........FINISH.................."<<std::endl;
+        }
+    }
+    else if(nodes.size()>1)
+    {
+        while( ! ok )
+        {
+            ROS_INFO("=============================== roboticslab: GLOBAL PLANNER: traceback begin ");
+            for(int nodeIdx=0; nodeIdx<nodes.size(); nodeIdx++)
             {
-                Node* tmp = nodes[nodeIdx];
-                std::cout<<"Node (" << tmp->_id << "): " << tmp->_x << ", " << tmp->_y << " ," << tmp->_z << std::endl;
-                planNodes.push_front(tmp);
-                path_MatCostmap.at<uchar>(tmp->_x, tmp->_y) = 80;
-                std::cout << "Path matcostmap   " << std::endl << path_MatCostmap << std::endl;
-
-                goalParentId = nodes[nodeIdx]->_parentId;
-                if( goalParentId == 0)
+                if( nodes[nodeIdx]->_id == goalParentId )
                 {
-                    ok = true;
-                    cv::imwrite("path.png",path_MatCostmap);
-                    std::cout<<"...........FINISH.................."<<std::endl;
-                    break;
+                    Node* tmp = nodes[nodeIdx];
+                    std::cout<<"Node (" << tmp->_id << "): " << tmp->_x << ", " << tmp->_y << " ," << tmp->_z << std::endl;
+                    if (layers_MatCostmap[tmp->_z].at<uchar>(tmp->_x,tmp->_y)==0)
+                    {
+                        planNodes.push_front(tmp);
+                    }
+                
+                    path_MatCostmap.at<uchar>(tmp->_x, tmp->_y) = 80;
+                    std::cout << "Path matcostmap   " << std::endl << path_MatCostmap << std::endl;
 
+                    goalParentId = nodes[nodeIdx]->_parentId;
+                    if( goalParentId == 0 || tmp->_id == 0)
+                    {
+                        ok = true;
+                        cv::imwrite("path.png",path_MatCostmap);
+                        std::cout<<"...........FINISH.................."<<std::endl;
+                        break;
+
+                    }
                 }
             }
         }
     }
+    else
+    {return false;}
+    
+    
 
     //Measure time traceback
     std::chrono::steady_clock::time_point end_traceback = std::chrono::steady_clock::now();
@@ -585,6 +640,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
     //Measure time plan
     std::chrono::steady_clock::time_point begin_plan = std::chrono::steady_clock::now();
+
 
     for(int i=0;i<planNodes.size();i++)
     {
