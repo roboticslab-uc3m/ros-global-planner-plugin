@@ -441,7 +441,6 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     std::cout<<"Other floor: "<<otherFloor<<std::endl;
     ROS_INFO_STREAM(" =============================== roboticslab: GLOBAL PLANNER: goal floor: "<< goalFloor<< " .");
 
-
     //BFS planning
     // ### * 0: libre
     // ### * 255: ocupado 
@@ -452,6 +451,17 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     cv::Mat copy_layers_MatCostmap[8];
     for(int i=0;i<8;i++)
         copy_layers_MatCostmap[i] = layers_MatCostmap[i].clone();
+
+    //Is the goal reachable?
+    if(copy_layers_MatCostmap[goalFloor].at<uchar>(goalX,goalY)==0)
+    {
+            ROS_INFO("GOAL REACHABLE");
+    }else
+    {    
+            ROS_ERROR("GOAL NOT REACHEABLE");
+            return false;
+    }
+
     
     copy_layers_MatCostmap[floorInit].at<uchar>(startX,startY) = 180;
     copy_layers_MatCostmap[goalFloor].at<uchar>(goalX,goalY) = 181;
@@ -469,18 +479,21 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
     //Measure time find path
     std::chrono::steady_clock::time_point begin_path = std::chrono::steady_clock::now();
+    int iter = 0;
+    int iter_max = 10;
 
-    while (!done)
+    while (!done && iter<iter_max)
     {
         std::cout<< "Looking for the goal"<<std::endl;
         ROS_INFO(" =============================== roboticslab: GLOBAL PLANNER:looking for the goal");
 
         int keepNodeSize = nodes.size();
-        std::cout<<"Nodes size: "<<keepNodeSize<<std::endl;
+        ROS_INFO("Nodes size: ", keepNodeSize);
         
         for(int nodeIdx=0; nodeIdx<keepNodeSize; nodeIdx++)
         {
-            std::cout<<"# Unit depth step of Node (" << nodes[nodeIdx]->_id << "): X: " << nodes[nodeIdx]->_x << ", Y: " << nodes[nodeIdx]->_y << " , Z: " << nodes[nodeIdx]->_z << std::endl;
+            ROS_INFO("FOR ");
+            ROS_INFO_STREAM("# Unit depth step of Node (" << nodes[nodeIdx]->_id << "): X: " << nodes[nodeIdx]->_x << ", Y: " << nodes[nodeIdx]->_y << " , Z: " << nodes[nodeIdx]->_z );
 
             int tmpX, tmpY, tmpZ;
             
@@ -556,6 +569,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
 
         }
+        iter++;
 
     }
 
@@ -596,8 +610,10 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
             ROS_INFO("=============================== roboticslab: GLOBAL PLANNER: traceback begin ");
             for(int nodeIdx=0; nodeIdx<nodes.size(); nodeIdx++)
             {
+                ROS_INFO("=============================== roboticslab: GLOBAL PLANNER: traceback begin FOR ");
                 if( nodes[nodeIdx]->_id == goalParentId )
                 {
+                    ROS_INFO("=============================== roboticslab: GLOBAL PLANNER: traceback begin IF ");
                     Node* tmp = nodes[nodeIdx];
                     std::cout<<"Node (" << tmp->_id << "): " << tmp->_x << ", " << tmp->_y << " ," << tmp->_z << std::endl;
                     if (layers_MatCostmap[tmp->_z].at<uchar>(tmp->_x,tmp->_y)==0)
