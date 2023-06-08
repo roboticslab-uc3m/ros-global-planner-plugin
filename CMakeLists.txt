@@ -120,8 +120,20 @@ include_directories(SYSTEM ${EIGEN3_INCLUDE_DIRS})
 ##  Class config  ##
 ####################
 
+add_executable(measure_time src/measure_time.cpp)
+
+add_dependencies(measure_time ${catkin_EXPORTED_TARGETS})
+
+target_link_libraries(measure_time
+${catkin_LIBRARIES}
+${PROJECT_NAME}
+)
+
+
+
 add_library(${PROJECT_NAME}
    src/roboticslab_global_planner.cpp
+   src/measure_time.cpp
 )
 
 
